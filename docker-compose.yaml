@@ -1,0 +1,152 @@
+services:
+  # --- USER SERVICE ---
+  user-service:
+    build:
+      context: ./user-service
+    container_name: user-service
+    environment:
+      - MONGO_USER=${MONGO_USER}
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
+      - MONGO_DB=${MONGO_DB}
+      - MONGO_HOST=${MONGO_HOST}
+      - MONGO_PORT=${MONGO_PORT}
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}
+    networks:
+      - user-network
+      - gateway-network
+    depends_on:
+      - user-mongo
+    volumes:
+      - ./logs/user-service:/logs
+
+  user-mongo:
+    image: mongo
+    container_name: user-mongo
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_DB}
+    volumes:
+      - mongo-user-data:/data/db
+    networks:
+      - user-network
+
+  # --- PRODUCT SERVICE ---
+  product-service:
+    build:
+      context: ./product-service
+    container_name: product-service
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}
+    depends_on:
+      - product-postgres
+    networks:
+      - product-network
+      - gateway-network
+
+  product-postgres:
+    image: postgres:15
+    container_name: product-postgres
+    restart: always
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - product-pgdata:/var/lib/postgresql/data
+    networks:
+      - product-network
+
+    # -- GATEWAY -----
+
+  api-gateway:
+    build:
+      context: ./Gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    networks:
+      - gateway-network
+    depends_on:
+      - user-service
+      # - product-service
+
+  # -- ELK ----
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.13.4
+    container_name: filebeat
+    user: root
+    depends_on:
+      - logstash
+    volumes:
+      - ./elk/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./logs/user-service:/logs/user-service:ro
+      - ./logs/product-service:/logs/product-service:ro
+      - ./logs/order-service:/logs/order-service:ro
+    networks:
+      - elk
+
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.4
+    container_name: logstash
+    depends_on:
+      - elasticsearch
+    ports:
+      - "5044:5044"
+    volumes:
+      - ./elk/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    networks:
+      - elk
+
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - elk
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: kibana
+    depends_on:
+      - elasticsearch
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    networks:
+      - elk
+
+
+networks:
+  user-network:
+  product-network:
+  gateway-network:
+  elk:
+
+volumes:
+  mongo-user-data:
+  product-pgdata:
+  elasticsearch-data:

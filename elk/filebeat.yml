@@ -1,0 +1,15 @@
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /logs/user-service/*.log
+      - /logs/product-service/*.log
+    fields_under_root: true
+    fields:
+      service: microservice
+    multiline.pattern: '^\d{4}-\d{2}-\d{2}'  # agrupar líneas de stacktrace
+    multiline.negate: true
+    multiline.match: after
+
+output.logstash:
+  hosts: ["logstash:5044"]

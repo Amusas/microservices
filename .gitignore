@@ -1,0 +1,19 @@
+# Ignorar archivos .env globales o locales
+.env
+.env.*
+
+# Ignorar carpetas y archivos de dependencias dentro de todos los subproyectos
+**/node_modules/
+**/.gradle/
+**/build/
+**/target/
+**/out/
+
+# Ignorar logs en cualquier subcarpeta
+**/*.log
+**/logs/
+
+# Ignorar archivos del sistema e IDEs
+**/.idea/
+**/.vscode/
+**/*.iml
