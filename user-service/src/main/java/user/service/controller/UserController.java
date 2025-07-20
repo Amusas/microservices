@@ -17,6 +17,7 @@ public class UserController {
 
     private final UserService userService;
 
+    //solo es un cambio en un comentario xd
     @PostMapping
     public ResponseEntity<User> create(@RequestBody User user) {
         log.info("Received request to create user: {}", user.getEmail());
